@@ -17,10 +17,14 @@ async function startServer() {
   app.post("/api/generate-quiz", async (req, res) => {
     try {
       const { passage, userApiKey } = req.body;
-      const apiKey = userApiKey || process.env.GEMINI_API_KEY;
+      
+      // Prioritize userApiKey only if it's a non-empty string
+      const apiKey = (userApiKey && userApiKey.trim() !== "") ? userApiKey : process.env.GEMINI_API_KEY;
 
       if (!apiKey) {
-        return res.status(401).json({ error: "API Key is required. Please provide your own or contact the administrator." });
+        return res.status(401).json({ 
+          error: "API Key is missing. Please set GEMINI_API_KEY in server environment variables or provide your own in the app settings." 
+        });
       }
 
       if (!passage) {

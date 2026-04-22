@@ -58,18 +58,26 @@ export default function App() {
     if (!passage.trim()) return;
     setLoading(true);
     try {
-      const quizResult = await generateQuiz(passage, userApiKey);
-      if (quizResult && !('error' in quizResult)) {
-        setResult(quizResult);
-        setContextAnswers(new Array(quizResult.contextQuestions.length).fill(''));
-        setNewAnswers(new Array(quizResult.newSentenceQuestions.length).fill(''));
+      const response = await fetch("/api/generate-quiz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ passage, userApiKey }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setResult(data);
+        setContextAnswers(new Array(data.contextQuestions.length).fill(''));
+        setNewAnswers(new Array(data.newSentenceQuestions.length).fill(''));
         setShowResults(false);
       } else {
-        alert('Failed to generate quiz. Please check your API key.');
+        // Show the actual error message from the server
+        alert(`Error: ${data.error || 'Failed to generate quiz.'}`);
       }
     } catch (err) {
       console.error(err);
-      alert('An unexpected error occurred.');
+      alert('An unexpected network error occurred.');
     } finally {
       setLoading(false);
     }
