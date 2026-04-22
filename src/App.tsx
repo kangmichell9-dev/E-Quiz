@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, ChangeEvent } from 'react';
+import { useEffect, useState, ChangeEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { BookOpen, Copy, Check, Sparkles, RefreshCcw, BookMarked, HelpCircle, GraduationCap, FileText, Upload } from 'lucide-react';
+import { BookOpen, Copy, Check, Sparkles, RefreshCcw, BookMarked, HelpCircle, GraduationCap, FileText, Upload, Settings, X, Key } from 'lucide-react';
 import { generateQuiz, QuizResult, QuizQuestion } from './lib/gemini';
 import { extractTextFromFile } from './lib/fileProcessor';
 
@@ -19,6 +19,25 @@ export default function App() {
   const [showResults, setShowResults] = useState(false);
   const [copiedContext, setCopiedContext] = useState(false);
   const [copiedNew, setCopiedNew] = useState(false);
+
+  // API Key Settings
+  const [showSettings, setShowSettings] = useState(false);
+  const [userApiKey, setUserApiKey] = useState('');
+  const [keyInput, setKeyInput] = useState('');
+
+  useEffect(() => {
+    const savedKey = localStorage.getItem('user_gemini_api_key');
+    if (savedKey) {
+      setUserApiKey(savedKey);
+      setKeyInput(savedKey);
+    }
+  }, []);
+
+  const handleSaveKey = () => {
+    localStorage.setItem('user_gemini_api_key', keyInput);
+    setUserApiKey(keyInput);
+    setShowSettings(false);
+  };
 
   const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -38,14 +57,22 @@ export default function App() {
   const handleGenerate = async () => {
     if (!passage.trim()) return;
     setLoading(true);
-    const quizResult = await generateQuiz(passage);
-    setResult(quizResult);
-    if (quizResult) {
-      setContextAnswers(new Array(quizResult.contextQuestions.length).fill(''));
-      setNewAnswers(new Array(quizResult.newSentenceQuestions.length).fill(''));
+    try {
+      const quizResult = await generateQuiz(passage, userApiKey);
+      if (quizResult && !('error' in quizResult)) {
+        setResult(quizResult);
+        setContextAnswers(new Array(quizResult.contextQuestions.length).fill(''));
+        setNewAnswers(new Array(quizResult.newSentenceQuestions.length).fill(''));
+        setShowResults(false);
+      } else {
+        alert('Failed to generate quiz. Please check your API key.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('An unexpected error occurred.');
+    } finally {
+      setLoading(false);
     }
-    setShowResults(false);
-    setLoading(false);
   };
 
   const copyToClipboard = async (questions: QuizQuestion[], type: 'context' | 'new') => {
@@ -62,20 +89,84 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-natural-bg text-natural-ink font-sans selection:bg-natural-pink flex flex-col">
+      {/* Settings Modal */}
+      <AnimatePresence>
+        {showSettings && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-natural-ink/20 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+              className="bg-white w-full max-w-md rounded-[32px] shadow-2xl border border-natural-beige p-8 space-y-6"
+            >
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-serif font-bold text-natural-olive flex items-center gap-2">
+                  <Key size={20} />
+                  API Key Settings
+                </h3>
+                <button onClick={() => setShowSettings(false)} className="text-natural-grey hover:text-natural-olive transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              <p className="text-sm text-natural-grey leading-relaxed">
+                If you have your own Google Gemini API key, enter it here. This will be stored securely in your browser and used for quiz generation.
+              </p>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-natural-grey">Gemini API Key</label>
+                <input 
+                  type="password"
+                  value={keyInput}
+                  onChange={(e) => setKeyInput(e.target.value)}
+                  placeholder="Enter your API key..."
+                  className="w-full px-5 py-3 bg-natural-bg rounded-xl border border-natural-beige focus:ring-2 focus:ring-natural-lime outline-none font-mono text-sm"
+                />
+              </div>
+              <button 
+                onClick={handleSaveKey}
+                className="w-full py-4 bg-natural-olive text-white rounded-xl font-bold uppercase tracking-widest text-xs hover:brightness-110 transition-all shadow-md"
+              >
+                Save & Use My Key
+              </button>
+              <button 
+                onClick={() => {
+                  localStorage.removeItem('user_gemini_api_key');
+                  setUserApiKey('');
+                  setKeyInput('');
+                  setShowSettings(false);
+                }}
+                className="w-full py-2 text-[10px] font-bold text-natural-grey hover:text-natural-pink transition-colors uppercase tracking-widest"
+              >
+                Reset to Default
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="max-w-5xl mx-auto w-full flex-1 p-6 md:p-12 md:border-x-8 md:border-natural-grey space-y-12">
         {/* Header */}
-        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b-2 border-natural-beige">
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b-2 border-natural-beige relative">
           <div className="space-y-1">
             <h1 className="text-4xl font-serif font-bold text-natural-olive tracking-tight">E-Quiz Maker Pro</h1>
             <p className="text-sm text-natural-grey italic uppercase tracking-[0.2em] font-medium">Dual-Mode Vocabulary Assistant</p>
           </div>
-          <div className="flex gap-4">
-            <div className="px-5 py-2 rounded-full border border-natural-accent text-xs font-bold text-natural-accent uppercase tracking-wider">
-              Interactive & Text-Based
-            </div>
-            <div className="px-5 py-2 bg-natural-olive text-white rounded-full text-xs font-bold uppercase tracking-wider shadow-sm flex items-center gap-2">
-              <Sparkles size={14} />
-              AI Educator
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setShowSettings(true)}
+              className={`p-3 rounded-xl border transition-all ${userApiKey ? 'border-natural-accent text-natural-accent bg-natural-accent/5' : 'border-natural-beige text-natural-grey hover:bg-white hover:shadow-sm'}`}
+              title="Settings"
+            >
+              <Settings size={20} className={userApiKey ? 'animate-pulse-slow' : ''} />
+            </button>
+            <div className="hidden md:flex gap-4">
+              <div className="px-5 py-2 rounded-full border border-natural-accent text-xs font-bold text-natural-accent uppercase tracking-wider">
+                Interactive Edition
+              </div>
+              <div className="px-5 py-2 bg-natural-olive text-white rounded-full text-xs font-bold uppercase tracking-wider shadow-sm flex items-center gap-2">
+                <Sparkles size={14} />
+                AI Educator
+              </div>
             </div>
           </div>
         </header>
@@ -127,6 +218,11 @@ export default function App() {
               >
                 {loading ? <RefreshCcw size={20} className="animate-spin" /> : <span>Generate All Quizzes</span>}
               </button>
+              {userApiKey && (
+                <p className="text-[9px] text-center text-natural-accent font-bold uppercase tracking-widest animate-pulse">
+                  Using Custom API Key
+                </p>
+              )}
             </div>
           </section>
 
