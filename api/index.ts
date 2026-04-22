@@ -44,14 +44,19 @@ app.post("/api/generate-quiz", async (req, res) => {
       }
     });
 
-    const text = response.text;
+    const result = await response;
+    const text = result.text;
     if (!text) {
-      throw new Error("Empty response from Gemini");
+      throw new Error("Gemini returned an empty response.");
     }
     res.json(JSON.parse(text));
   } catch (error) {
-    console.error("Gemini Error:", error);
-    res.status(500).json({ error: "Failed to generate quiz." });
+    console.error("Gemini Error Details:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ 
+      error: `Gemini call failed: ${errorMessage}`,
+      suggestion: "Please verify your API Key in Vercel settings and ensure the model 'gemini-3-flash-preview' is available for your project."
+    });
   }
 });
 
